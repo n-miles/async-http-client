@@ -85,6 +85,7 @@ public abstract class RequestBuilderBase<T extends RequestBuilderBase<T>> {
   protected int readTimeout;
   protected long rangeOffset;
   protected Charset charset;
+  private boolean allowNoCharset;
   protected ChannelPoolPartitioning channelPoolPartitioning = ChannelPoolPartitioning.PerHostChannelPoolPartitioning.INSTANCE;
   protected NameResolver<InetAddress> nameResolver = DEFAULT_NAME_RESOLVER;
 
@@ -524,6 +525,11 @@ public abstract class RequestBuilderBase<T extends RequestBuilderBase<T>> {
     return asDerivedType();
   }
 
+  public T allowNoCharset() {
+    this.allowNoCharset = true;
+    return asDerivedType();
+  }
+
   public T setChannelPoolPartitioning(ChannelPoolPartitioning channelPoolPartitioning) {
     this.channelPoolPartitioning = channelPoolPartitioning;
     return asDerivedType();
@@ -588,8 +594,13 @@ public abstract class RequestBuilderBase<T extends RequestBuilderBase<T>> {
   private void updateCharset() {
     String contentTypeHeader = headers.get(CONTENT_TYPE);
     Charset contentTypeCharset = extractContentTypeCharsetAttribute(contentTypeHeader);
+
+    boolean shouldAddCharsetToHeader = !allowNoCharset &&
+            contentTypeHeader != null &&
+            contentTypeCharset == null &&
+            contentTypeHeader.regionMatches(true, 0, "text/", 0, 5);
     charset = withDefault(contentTypeCharset, withDefault(charset, UTF_8));
-    if (contentTypeHeader != null && contentTypeHeader.regionMatches(true, 0, "text/", 0, 5) && contentTypeCharset == null) {
+    if (shouldAddCharsetToHeader) {
       // add explicit charset to content-type header
       headers.set(CONTENT_TYPE, contentTypeHeader + "; charset=" + charset.name());
     }
